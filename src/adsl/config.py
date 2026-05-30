@@ -106,7 +106,7 @@ class ExperimentConfig:
     name: str
     seed: int = 0
     output_root: str = "results/runs"
-    env: EnvConfig = field(default_factory=lambda: EnvConfig(id="CartPole-v1"))
+    env: EnvConfig = field(default_factory=lambda: EnvConfig(id="HalfCheetah-v4"))
     training: TrainingConfig = field(default_factory=TrainingConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     experts: ExpertsConfig = field(default_factory=ExpertsConfig)

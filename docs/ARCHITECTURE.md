@@ -11,7 +11,7 @@
 7. Roll forward shadow SAC updates under candidate intervention actions.
 8. Score policy deviation relative to the clean-policy reference actor using baseline deviation, predicted return drop, and detector risk.
 9. Accept, attenuate, sanitize, or block replay admission and weighting.
-10. Record structured outputs for experiments and dashboards, including harmful-update control, final-return outcomes, evaluation-return AUC, and supporting robustness metrics.
+10. Record structured outputs for the retained reports, including harmful-update control, final-return outcomes, evaluation-return AUC, telemetry, and supporting robustness metrics.
 
 ## Main Modules
 
@@ -21,4 +21,5 @@
 - `adsl.control`: baseline reference, MCTS look-ahead, and intervention logic
 - `adsl.data`: replay buffer, clean replay sampling, and sliding windows
 - `adsl.pipelines`: experiment orchestration
-- `adsl.dashboard`: result aggregation and reporting
+- `adsl.telemetry`: runtime telemetry capture for the full matrix
+- `adsl.pipelines_iforest`: detector-only Isolation Forest baseline orchestration

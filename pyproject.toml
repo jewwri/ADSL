@@ -29,9 +29,6 @@ detectors = [
 mujoco = [
   "gymnasium[mujoco]>=0.29",
 ]
-databricks = [
-  "pyspark>=3.5",
-]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

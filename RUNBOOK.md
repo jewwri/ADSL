@@ -1,63 +1,70 @@
-# Runbook for the Active MCTS ADSL Campaign
+# Runbook
 
-## Immediate Goal
+## Retained Result Families
 
-Complete the full `270`-run dissertation matrix for the MCTS-based ADSL defense while keeping the run path consistent and resume-safe.
+The checked-in result tree is intentionally limited to:
 
-## Active Matrix
+- `results/dissertation/mcts_poison_runs_200k/`
+- `results/dissertation/telemetry_runs/`
+- `results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909/`
+- derived reports and visual datasets for those runs
 
-- environments: `HalfCheetah-v4`, `Walker2d-v4`, `Hopper-v4`
-- schedules: `random_sparse`, `bursty`
-- poison types: `reward_poisoning`, `action_perturbation`, `observation_corruption`
-- conditions: `clean`, `attack_none`, `attack_defended`
-- seeds: `0-4`
+The canonical manifest is `experiments/canonical_experiments.json`.
 
-## Standard Command
+## Validate The Artifact
 
 ```bash
-python3 scripts/run_dissertation_campaign.py --output-root results/dissertation/mcts_poison_runs
+python3 scripts/validate_research_artifact.py
+pytest -q
+python3 -m compileall src scripts tests
 ```
 
-The runner skips completed cells by matching `config.json` plus final `global_step`, so it is safe to rerun after interruption.
+## Reproduce Or Resume The 200k MCTS Matrix
 
-## Pre-Run Validation
+```bash
+python3 scripts/run_dissertation_campaign.py \
+  --output-root results/dissertation/mcts_poison_runs_200k \
+  --total-steps 200000
+```
 
-Before launching the full matrix, verify:
+The runner is resume-safe and skips completed cells by matching `config.json` plus final `global_step`.
 
-- the target MuJoCo environment versions are available
-- `pytest -q` passes
-- `python3 -m compileall src scripts tests` passes
-- a short defended smoke run writes `mcts_traces.csv`
+## Rebuild The 200k MCTS Report Data
 
-## Research-Critical Checks
+```bash
+python3 scripts/analyze_dissertation_results.py \
+  --results-dir results/dissertation/mcts_poison_runs_200k \
+  --output results/dissertation/mcts_final_report_200k.md
 
-Before accepting a configuration as dissertation-valid, confirm:
+python3 scripts/export_visual_datasets.py \
+  --results-dir results/dissertation/mcts_poison_runs_200k \
+  --output-dir results/dissertation/visual_data_200k
+```
 
-- detector flags occur after attack onset
-- MCTS traces are written for flagged defended windows
-- root actions include more than trivial `accept` behavior under attack
-- sanitized transitions increase in defended attacked conditions
-- harmful accepted updates are lower than `attack_none`
+## Rebuild Window-200 MCTS Artifacts
 
-## Runtime Guidance
+```bash
+python3 scripts/build_window200_report.py \
+  --results-root results/dissertation/parameterized_runs \
+  --output-root results/dissertation/window200_artifacts \
+  --total-steps 200000
+```
 
-- do not edit training logic while workers are active
-- do not change thresholds mid-campaign
-- keep the output root fixed to preserve resume behavior
-- treat interrupted defended runs as rerunnable, not reusable, unless they reached full `total_steps`
+The source `parameterized_runs` tree is archived because only the derived `window200_artifacts` are part of the active checked-in result set.
 
-## Reporting Packet
+## Rebuild Isolation Forest Comparison Artifacts
 
-Use the following artifacts during and after the run:
+```bash
+python3 scripts/build_iforest_window200_report.py \
+  --iforest-root results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909 \
+  --mcts-root results/dissertation/window200_artifacts/window200_selected_runs \
+  --output-root results/dissertation/iforest_window200_artifacts \
+  --total-steps 200000
+```
 
-- [docs/METHODOLOGY_DRAFT.md](/Users/jewellwright/Documents/ADSL/docs/METHODOLOGY_DRAFT.md:1)
-- [results/dissertation/mcts_interim_results.md](/Users/jewellwright/Documents/ADSL/results/dissertation/mcts_interim_results.md:1)
-- `results/dissertation/mcts_poison_runs/summary.csv`
+## Validation
 
-## Common Failure Modes
-
-- detector thresholds too high, causing MCTS never to trigger after attack onset
-- detector thresholds too low, causing excessive sanitization in benign windows
-- defended return drop despite strong harmful-update reduction
-- environment-dependent divergence, especially under observation corruption
-- partial result directories left after interrupted runs
+```bash
+pytest -q
+python3 -m compileall src scripts tests
+```

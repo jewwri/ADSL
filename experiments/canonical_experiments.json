@@ -1,0 +1,54 @@
+{
+  "artifact_version": "2026-05-30-cleanup",
+  "title": "ADSL doctoral dissertation experiment artifact",
+  "scope": {
+    "environments": ["HalfCheetah-v4", "Hopper-v4", "Walker2d-v4"],
+    "poison_types": ["reward_poisoning", "action_perturbation", "observation_corruption"],
+    "schedules": ["random_sparse", "bursty"],
+    "seeds": [0, 1, 2, 3, 4],
+    "total_steps": 200000
+  },
+  "experiments": {
+    "mcts_200k": {
+      "kind": "mcts_matrix",
+      "summary": "results/dissertation/mcts_poison_runs_200k/summary.csv",
+      "root": "results/dissertation/mcts_poison_runs_200k",
+      "conditions": ["clean", "attack_none", "attack_defended"],
+      "expected_rows": 270,
+      "expected_global_step": 200000,
+      "report": "results/dissertation/mcts_final_report_200k.md",
+      "visual_data": "results/dissertation/visual_data_200k"
+    },
+    "telemetry_full_matrix": {
+      "kind": "telemetry_matrix",
+      "summaries": [
+        "results/dissertation/telemetry_runs/telemetry_full_matrix_workers10_20260507T215246/summary.csv",
+        "results/dissertation/telemetry_runs/telemetry_full_matrix_workers10_20260510T095822/summary.csv"
+      ],
+      "root": "results/dissertation/telemetry_runs",
+      "conditions": ["clean", "attack_none", "attack_defended"],
+      "expected_rows": 270,
+      "expected_global_step": 200000
+    },
+    "iforest_window200_baseline": {
+      "kind": "iforest_detector_only_baseline",
+      "summary": "results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909/summary.csv",
+      "root": "results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909",
+      "conditions": ["detector_only"],
+      "expected_rows": 90,
+      "expected_global_step": 200000,
+      "report": "results/dissertation/iforest_window200_artifacts/iforest_window200_final_report.md",
+      "comparison_report": "results/dissertation/iforest_window200_artifacts/iforest_vs_mcts_window200_summary.csv"
+    }
+  },
+  "derived_outputs": [
+    "results/dissertation/hypothesis_support_summary.csv",
+    "results/dissertation/poisoned_cell_support_matrix.csv",
+    "results/dissertation/detector_learning_linkage.csv",
+    "results/dissertation/detector_learning_linkage.md",
+    "results/dissertation/window200_artifacts",
+    "results/dissertation/iforest_window200_artifacts",
+    "results/dissertation/visual_data_200k"
+  ],
+  "ignored_archive": "results/ignored_archive"
+}

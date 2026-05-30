@@ -30,7 +30,7 @@ ADSL is constructed as a multi-stage defense ensemble rather than a single detec
 - an MCTS look-ahead controller
 - a replay-buffer intervention layer
 
-An optional fifth component is available for ablations: an expert classifier over detector-window features. This expert path is advisory rather than authoritative, and it is disabled in the final dissertation MCTS matrix to isolate detector + reference actor + MCTS behavior.
+An optional fifth component exists in the codebase: an expert classifier over detector-window features. This expert path is advisory rather than authoritative, and it is disabled in the final dissertation MCTS matrix to isolate detector + reference actor + MCTS behavior.
 
 The detector operates on windows of `50` transitions. It extracts reward statistics, action statistics, state-shift features, and temporal-delta features and produces a scalar anomaly risk. The detector is intentionally permissive: it is used as a trigger for deeper validation rather than the final decision maker.
 

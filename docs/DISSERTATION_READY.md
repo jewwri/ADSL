@@ -30,8 +30,8 @@ Additional clarifications:
 - the detector is intentionally permissive and only triggers deeper validation
 - MCTS is the decision authority after a detector flag
 - the MCTS transition is a short-horizon shadow learning update used to estimate downstream training harm rather than a conventional planning transition
-- the final campaign uses the generic SAC actor from [src/adsl/rl.py](/Users/jewellwright/Documents/ADSL/src/adsl/rl.py:18)
-- the optional expert classifier remains available for ablations but is disabled in the final matrix
+- the final campaign uses the generic SAC actor from `src/adsl/rl.py`
+- the optional expert classifier is disabled in the retained final matrix
 
 ## Replay Sanitization
 
@@ -54,7 +54,7 @@ Replay sanitization is implemented as replay-admission control and clean-batch s
 
 The full `270`-run, `200k`-step MCTS dissertation matrix is complete. The primary report is:
 
-- [mcts_final_report.md](/Users/jewellwright/Documents/ADSL/results/dissertation/mcts_final_report.md:1)
+- `results/dissertation/mcts_final_report_200k.md`
 
 Current dissertation-safe interpretation:
 
@@ -67,7 +67,7 @@ Current dissertation-safe interpretation:
 
 The visual-ready final `200k` datasets are:
 
-- [final_run_dataset.csv](/Users/jewellwright/Documents/ADSL/results/dissertation/visual_data/final_run_dataset.csv:1)
-- [final_run_dataset.parquet](/Users/jewellwright/Documents/ADSL/results/dissertation/visual_data/final_run_dataset.parquet:1)
-- [eval_curve_dataset.csv](/Users/jewellwright/Documents/ADSL/results/dissertation/visual_data/eval_curve_dataset.csv:1)
-- [eval_curve_dataset.parquet](/Users/jewellwright/Documents/ADSL/results/dissertation/visual_data/eval_curve_dataset.parquet:1)
+- `results/dissertation/visual_data_200k/final_run_dataset.csv`
+- `results/dissertation/visual_data_200k/final_run_dataset.parquet`
+- `results/dissertation/visual_data_200k/eval_curve_dataset.csv`
+- `results/dissertation/visual_data_200k/eval_curve_dataset.parquet`

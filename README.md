@@ -1,82 +1,55 @@
-# ADSL Research Repository
+# ADSL Dissertation Experiments
 
-This repository contains the active `ADSL` dissertation experiment stack for poisoned continuous-control reinforcement learning. The current research path centers on:
+This repository now tracks only the dissertation experiment path that matters for the final analysis:
 
-- baseline SAC training in MuJoCo continuous-control environments
-- simulated `reward_poisoning`, `action_perturbation`, and `observation_corruption`
-- window-based anomaly detection with `window_length=50`
-- post-detection Monte Carlo Tree Search (MCTS) look-ahead validation
-- replay-buffer gating, sanitization, attenuation, and blocking
-- dissertation reporting around detection quality and learning robustness
+- the `200k` MCTS dissertation matrix
+- the telemetry full matrix
+- the Isolation Forest detector-only baseline
+- derived report and visualization data for those result families
 
-## Current Experiment Scope
+## Experiment Scope
 
-The primary dissertation campaign is:
+All retained experiments use:
 
 - environments: `HalfCheetah-v4`, `Walker2d-v4`, `Hopper-v4`
-- schedules: `random_sparse`, `bursty`
 - poison types: `reward_poisoning`, `action_perturbation`, `observation_corruption`
-- conditions: `clean`, `attack_none`, `attack_defended`
+- schedules: `random_sparse`, `bursty`
 - seeds: `0-4`
+- horizon: `200000` environment steps
 
-The defended path uses a detector-triggered MCTS validator that estimates policy deviation from a clean baseline actor before allowing poisoned experience to influence replay or updates.
-That baseline actor is a clean-policy reference snapshot captured after warmup, not a fixed optimal policy target.
+The MCTS matrices compare `clean`, `attack_none`, and `attack_defended`. The Isolation Forest baseline is detector-only.
 
-The actor used in the dissertation campaign is the generic SAC actor from [src/adsl/rl.py](/Users/jewellwright/Documents/ADSL/src/adsl/rl.py:18): a tanh-squashed Gaussian policy with a `256 x 256` MLP backbone.
+## Active Results
 
-The optional expert path uses the classifier in [src/adsl/experts.py](/Users/jewellwright/Documents/ADSL/src/adsl/experts.py:18), trained on detector-window features and dominant window corruption labels. In the final MCTS matrix, `experts.enabled=false` so the main results isolate the detector + clean-policy reference + MCTS intervention stack.
+The machine-readable source of truth is `experiments/canonical_experiments.json`.
 
-## Repository Layout
+- `results/dissertation/mcts_poison_runs_200k/`
+- `results/dissertation/telemetry_runs/`
+- `results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909/`
+- `results/dissertation/visual_data_200k/`
+- `results/dissertation/window200_artifacts/`
+- `results/dissertation/iforest_window200_artifacts/`
 
-- `src/adsl/`: core training, detection, corruption, control, and logging code
-- `scripts/`: experiment runners, analysis entrypoints, and campaign orchestration
-- `docs/`: architecture, dissertation-path notes, and methodology drafts
-- `results/`: generated reports and experiment outputs
-- `databricks/`: optional remote execution scaffolding
+Older smoke runs, pilot configs, generated caches, and superseded campaign outputs have been moved under `results/ignored_archive/`, which is intentionally ignored by Git.
 
-## Recommended First Steps
+## Active Code
 
-1. Create a Python environment and install dependencies from `pyproject.toml`.
-2. Read [docs/DISSERTATION_READY.md](/Users/jewellwright/Documents/ADSL/docs/DISSERTATION_READY.md:1).
-3. Read [docs/METHODOLOGY_DRAFT.md](/Users/jewellwright/Documents/ADSL/docs/METHODOLOGY_DRAFT.md:1).
-4. Launch or resume the dissertation campaign:
+- `src/adsl/`: SAC training, corruption, detection, MCTS control, telemetry, and Isolation Forest pipelines
+- `scripts/run_dissertation_campaign.py`: `200k` MCTS matrix runner
+- `scripts/run_parameterized_campaign.py`: parameterized MCTS or Isolation Forest campaign runner
+- `scripts/run_window200_worker_pool.py`: coordinated window-200 MCTS worker pool
+- `scripts/run_iforest_detector_baseline.py`: detector-only Isolation Forest baseline runner
+- `scripts/analyze_dissertation_results.py`: MCTS report builder
+- `scripts/export_visual_datasets.py`: visual dataset exporter
+- `scripts/build_window200_report.py`: window-200 MCTS report builder
+- `scripts/build_iforest_window200_report.py`: Isolation Forest comparison report builder
 
-```bash
-python3 scripts/run_dissertation_campaign.py \
-  --output-root results/dissertation/mcts_poison_runs_200k \
-  --total-steps 200000
-```
+## Documentation
 
-The runner is resume-safe and skips completed cells automatically.
-
-For parameterized reruns without touching the dissertation script itself, use:
-
-```bash
-python3 scripts/run_parameterized_campaign.py \
-  --backend mcts \
-  --output-root results/dissertation/mcts_poison_runs_window200 \
-  --total-steps 200000 \
-  --window-length 200 \
-  --detector-threshold 0.2
-```
-
-Or for the isolated detector-only baseline:
-
-```bash
-python3 scripts/run_parameterized_campaign.py \
-  --backend iforest \
-  --output-root results/dissertation/iforest_detector_runs_window200 \
-  --total-steps 200000 \
-  --window-length 200 \
-  --detector-threshold 0.5 \
-  --gate-mode sanitize
-```
-
-## Reporting
-
-Current primary reporting artifacts:
-
-- final `200k` results: [mcts_final_report.md](/Users/jewellwright/Documents/ADSL/results/dissertation/mcts_final_report.md:1)
-- dissertation-path notes: [DISSERTATION_READY.md](/Users/jewellwright/Documents/ADSL/docs/DISSERTATION_READY.md:1)
-- methodology draft: [METHODOLOGY_DRAFT.md](/Users/jewellwright/Documents/ADSL/docs/METHODOLOGY_DRAFT.md:1)
-- architecture summary: [ARCHITECTURE.md](/Users/jewellwright/Documents/ADSL/docs/ARCHITECTURE.md:1)
+- `RUNBOOK.md`
+- `docs/REPRODUCIBILITY.md`
+- `docs/DATA_DICTIONARY.md`
+- `docs/METHODOLOGY_DRAFT.md`
+- `docs/README_WINDOW200.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DISSERTATION_READY.md`

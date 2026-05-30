@@ -20,7 +20,7 @@ from adsl.pipelines import run_experiment
 
 ENV_PRESETS = {
     "HalfCheetah-v4": TrainingConfig(
-        total_steps=10000,
+        total_steps=200000,
         batch_size=256,
         replay_size=100000,
         start_steps=1000,
@@ -31,7 +31,7 @@ ENV_PRESETS = {
         eval_episodes=2,
     ),
     "Walker2d-v4": TrainingConfig(
-        total_steps=10000,
+        total_steps=200000,
         batch_size=256,
         replay_size=100000,
         start_steps=1000,
@@ -42,7 +42,7 @@ ENV_PRESETS = {
         eval_episodes=2,
     ),
     "Hopper-v4": TrainingConfig(
-        total_steps=10000,
+        total_steps=200000,
         batch_size=256,
         replay_size=100000,
         start_steps=1000,
@@ -122,9 +122,8 @@ def build_config(
         trigger_threshold=0.12 if schedule == "random_sparse" else 0.14,
         warmup_steps=1000,
     )
-    # The final dissertation matrix isolates detector + reference actor + MCTS
-    # behavior. The advisory expert classifier remains available for ablations but
-    # is disabled in the main matrix.
+    # The retained dissertation matrix isolates detector + reference actor + MCTS
+    # behavior. The advisory expert classifier is disabled in the main matrix.
     experts = ExpertsConfig(enabled=False, mode="none", classes=["clean", poison_type])
     controller = ControllerConfig(
         enabled=condition == "attack_defended",
@@ -201,7 +200,7 @@ def _find_matching_completed_run(output_root: str, config: ExperimentConfig) -> 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-root", default="results/dissertation/mcts_poison_runs")
+    parser.add_argument("--output-root", default="results/dissertation/mcts_poison_runs_200k")
     parser.add_argument("--total-steps", type=int, default=None)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     parser.add_argument("--envs", nargs="+", default=["HalfCheetah-v4", "Walker2d-v4", "Hopper-v4"])

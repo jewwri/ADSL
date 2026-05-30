@@ -144,7 +144,13 @@ def build_iforest_config(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-root", default="results/dissertation/iforest_detector_runs")
+    parser.add_argument(
+        "--output-root",
+        default=(
+            "results/dissertation/iforest_parameterized_runs/"
+            "window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909"
+        ),
+    )
     parser.add_argument("--total-steps", type=int, default=200000)
     parser.add_argument("--window-length", type=int, default=200)
     parser.add_argument("--warmup-steps", type=int, default=1000)
