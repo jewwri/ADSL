@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adsl"
+version = "0.1.0"
+description = "Adaptive defense and supervisory layer for reinforcement learning experiments"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "gymnasium>=0.29",
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "psutil>=5.9",
+  "pyyaml>=6.0",
+  "torch>=2.2",
+  "plotly>=5.22",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+detectors = [
+  "scikit-learn>=1.5",
+]
+mujoco = [
+  "gymnasium[mujoco]>=0.29",
+]
+databricks = [
+  "pyspark>=3.5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,7 @@
+phase: pilot
+matrix_path: ABLATION_MATRIX.csv
+default_output_root: results/runs
+default_total_steps: 20000
+default_eval_every: 2000
+notes: First-wave ablations for detection, expert comparison, and controller value.
+
