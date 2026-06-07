@@ -1,12 +1,5 @@
 # ADSL Dissertation Experiments
 
-This repository now tracks only the dissertation experiment path that matters for the final analysis:
-
-- the `200k` MCTS dissertation matrix
-- the telemetry full matrix
-- the Isolation Forest detector-only baseline
-- derived report and visualization data for those result families
-
 ## Experiment Scope
 
 All retained experiments use:
@@ -29,8 +22,6 @@ The machine-readable source of truth is `experiments/canonical_experiments.json`
 - `results/dissertation/visual_data_200k/`
 - `results/dissertation/window200_artifacts/`
 - `results/dissertation/iforest_window200_artifacts/`
-
-Older smoke runs, pilot configs, generated caches, and superseded campaign outputs have been moved under `results/ignored_archive/`, which is intentionally ignored by Git.
 
 ## Active Code
 
