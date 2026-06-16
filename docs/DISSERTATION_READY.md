@@ -18,7 +18,7 @@ The defended path is built around a detector-triggered MCTS look-ahead validator
 - the detector flags a suspicious transition window
 - ADSL launches an MCTS look-ahead over intervention choices
 - each MCTS branch performs a shadow SAC update and scores deviation from a clean-policy reference actor
-- the selected action controls whether flagged experience is accepted, attenuated, blocked, or sanitized
+- the selected action controls whether flagged experience is accepted or sanitized
 
 This is the current dissertation novelty path and supersedes earlier proxy-controller variants.
 
@@ -37,10 +37,11 @@ Additional clarifications:
 
 Replay sanitization is implemented as replay-admission control and clean-batch substitution:
 
-- blocked or sanitized harmful transitions are withheld from replay insertion
-- defended update batches can be replaced with clean-only replay or mixed with clean replay under weighted attenuation
-- withheld transitions are counted in `sanitized_transitions`
-- `sanitize_clean_replay_uses` and `attenuate_clean_replay_uses` log how often those paths actually used clean-only replay
+- sanitized suspicious transitions are captured for expert evidence and withheld from learner replay insertion
+- defended sanitize updates are replaced with clean-only replay when clean replay is available
+- withheld suspicious transitions are counted in `sanitized_transitions`
+- `captured_suspicious_windows` and `captured_harmful_windows` record expert-training evidence capture
+- `sanitize_clean_replay_uses` logs how often sanitation used clean-only replay
 
 ## Finalized Hypotheses
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,11 @@ class TrainingConfig:
     lr: float = 3e-4
     eval_every: int = 2_000
     eval_episodes: int = 5
+    early_stopping_enabled: bool = False
+    early_stopping_min_steps: int = 100_000
+    early_stopping_patience_evals: int = 25
+    early_stopping_min_delta: float = 0.01
+    early_stopping_smoothing_window: int = 5
 
 
 @dataclass
@@ -69,8 +74,6 @@ class ControllerConfig:
     baseline_warmup_steps: int = 1000
     baseline_reference_size: int = 128
     deviation_threshold: float = 0.15
-    attenuate_clean_ratio: float = 0.5
-    attenuate_replay_mode: str = "weighted_mix"
     sanitize_replay_mode: str = "clean_only_replacement"
 
 
@@ -116,7 +119,8 @@ class ExperimentConfig:
 
 
 def _construct(cls, data: dict[str, Any]):
-    return cls(**data)
+    allowed = {field.name for field in fields(cls)}
+    return cls(**{key: value for key, value in data.items() if key in allowed})
 
 
 def load_experiment_config(path: str | Path) -> ExperimentConfig:

@@ -10,7 +10,7 @@
 6. Define MCTS state as learner snapshot + suspicious window summary + replay context.
 7. Roll forward shadow SAC updates under candidate intervention actions.
 8. Score policy deviation relative to the clean-policy reference actor using baseline deviation, predicted return drop, and detector risk.
-9. Accept, attenuate, sanitize, or block replay admission and weighting.
+9. Accept or sanitize replay admission. Sanitization captures suspicious evidence for expert learning, withholds suspicious replay influence, and trains from clean replay when available.
 10. Record structured outputs for the retained reports, including harmful-update control, final-return outcomes, evaluation-return AUC, telemetry, and supporting robustness metrics.
 
 ## Main Modules
@@ -22,4 +22,4 @@
 - `adsl.data`: replay buffer, clean replay sampling, and sliding windows
 - `adsl.pipelines`: experiment orchestration
 - `adsl.telemetry`: runtime telemetry capture for the full matrix
-- `adsl.pipelines_iforest`: detector-only Isolation Forest baseline orchestration
+- `adsl.pipelines_iforest`: Isolation Forest sanitize-gated ablation orchestration

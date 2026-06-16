@@ -51,19 +51,18 @@ This clean-only replay path is necessary for two reasons. First, it allows repla
 
 Replay intervention semantics are explicit:
 
-- `sanitize` uses `clean_only_replacement`: flagged replay influence is replaced with clean-only replay samples when clean replay is available
-- `attenuate` uses `weighted_mix`: flagged replay is mixed with clean replay using a configurable clean ratio, currently `0.5`
-- `block` withholds the current corrupted transition from replay insertion and skips the learning update
+- `sanitize` uses `clean_only_replacement`: flagged replay influence is captured for expert evidence, withheld from learner replay, and replaced with clean-only replay samples when clean replay is available
+- `accept` keeps the transition in learner replay when detector/controller confidence is insufficient for sanitation
 - `accept` leaves replay admission and sampling unchanged
 
-The implementation logs whether clean replay was actually available and how often `sanitize` and `attenuate` successfully used clean-only replay rather than falling back to ordinary replay.
+The implementation logs whether clean replay was actually available, how often `sanitize` used clean-only replay, and how many suspicious windows were captured for expert training.
 
 ## 4. Implement Gating And Weighting
 
 The defended gating mechanism is a post-detection MCTS look-ahead. After the detector flags a suspicious window, ADSL constructs a look-ahead problem with:
 
 - state = current learner state + suspicious window summary + replay context
-- actions = `accept`, `attenuate`, `block`, `sanitize`
+- actions = `accept`, `sanitize`
 - transition = one short-horizon shadow learning update under the selected intervention
 - reward/score = weighted combination of deviation from clean baseline behavior, predicted return drop, and detector risk
 
@@ -76,9 +75,8 @@ For each candidate intervention, MCTS simulates a short-horizon shadow SAC updat
 The chosen action governs how the training pipeline handles the suspicious experience:
 
 - `accept`: admit the transition and train normally
-- `attenuate`: mix flagged replay with clean replay
-- `block`: skip the update and withhold harmful replay insertion
-- `sanitize`: replace flagged replay influence with clean-only replay
+- `accept`: allow low-confidence suspicious windows to continue training
+- `sanitize`: capture suspicious evidence, withhold suspicious replay influence, and replace the learner update with clean-only replay when available
 
 This design allows the detector threshold to remain lower than a one-stage detector-controller system could tolerate, because the final intervention is validated by look-ahead rather than by anomaly score alone.
 
@@ -98,8 +96,9 @@ Evaluation is organized around both detection and downstream robustness. Detecti
 - sanitized transition count
 - time-to-threshold relative to the clean baseline
 - detector flag count and flag rate
-- intervention frequencies for `accept`, `attenuate`, `block`, and `sanitize`
-- how often `sanitize` and `attenuate` actually used clean-only replay
+- intervention frequencies for `accept` and `sanitize`
+- how often `sanitize` actually used clean-only replay
+- captured suspicious-window counts for expert training
 
 The primary hypothesis tests are:
 
@@ -114,7 +113,7 @@ Each experimental cell uses `5` seeds and trains for `200,000` environment steps
 Analysis is not limited to whether the defense helps. It also asks how it helps and where it fails. For each environment, schedule, and poison type, the study compares:
 
 - detector quality in attacked conditions
-- how often MCTS chooses `accept`, `attenuate`, `sanitize`, or `block`
+- how often MCTS chooses `accept` or `sanitize`
 - how often flagged windows lead to clean-only replay usage
 - whether strong contamination reduction is accompanied by return gains
 - whether evaluation-return AUC improves even when final return does not

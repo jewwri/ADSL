@@ -1,5 +1,12 @@
 # ADSL Dissertation Experiments
 
+This repository now tracks only the dissertation experiment path that matters for the final analysis:
+
+- the `200k` MCTS dissertation matrix
+- the telemetry full matrix
+- the Isolation Forest sanitize-gated ablation
+- derived report and visualization data for those result families
+
 ## Experiment Scope
 
 All retained experiments use:
@@ -10,7 +17,7 @@ All retained experiments use:
 - seeds: `0-4`
 - horizon: `200000` environment steps
 
-The MCTS matrices compare `clean`, `attack_none`, and `attack_defended`. The Isolation Forest baseline is detector-only.
+The MCTS matrices compare `clean`, `attack_none`, and `attack_defended`. The Isolation Forest comparison is a sanitize-gated no-lookahead ablation, not a passive detector-only baseline.
 
 ## Active Results
 
@@ -29,7 +36,7 @@ The machine-readable source of truth is `experiments/canonical_experiments.json`
 - `scripts/run_dissertation_campaign.py`: `200k` MCTS matrix runner
 - `scripts/run_parameterized_campaign.py`: parameterized MCTS or Isolation Forest campaign runner
 - `scripts/run_window200_worker_pool.py`: coordinated window-200 MCTS worker pool
-- `scripts/run_iforest_detector_baseline.py`: detector-only Isolation Forest baseline runner
+- `scripts/run_iforest_detector_baseline.py`: Isolation Forest sanitize-gated ablation runner
 - `scripts/analyze_dissertation_results.py`: MCTS report builder
 - `scripts/export_visual_datasets.py`: visual dataset exporter
 - `scripts/build_window200_report.py`: window-200 MCTS report builder

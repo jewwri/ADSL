@@ -31,7 +31,7 @@
       "expected_global_step": 200000
     },
     "iforest_window200_baseline": {
-      "kind": "iforest_detector_only_baseline",
+      "kind": "iforest_sanitize_gated_ablation",
       "summary": "results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909/summary.csv",
       "root": "results/dissertation/iforest_parameterized_runs/window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909",
       "conditions": ["detector_only"],

@@ -128,7 +128,7 @@ def build_config(
     controller = ControllerConfig(
         enabled=condition == "attack_defended",
         mode="mcts" if condition == "attack_defended" else "none",
-        harm_threshold=0.25,
+        harm_threshold=0.5,
         sanitize_replay=condition == "attack_defended",
         mcts_simulations=16,
         mcts_horizon=2,
@@ -136,8 +136,6 @@ def build_config(
         baseline_warmup_steps=1000,
         baseline_reference_size=128,
         deviation_threshold=0.15,
-        attenuate_clean_ratio=0.5,
-        attenuate_replay_mode="weighted_mix",
         sanitize_replay_mode="clean_only_replacement",
     )
     corruption = _corruption_for(poison_type, schedule, condition)
@@ -154,6 +152,23 @@ def build_config(
         corruption=corruption,
         logging=LoggingConfig(save_transition_windows=False, save_model_checkpoints=False),
     )
+
+
+def _apply_early_stopping_args(config: ExperimentConfig, args) -> None:
+    config.training.early_stopping_enabled = bool(args.early_stopping)
+    config.training.early_stopping_min_steps = int(args.early_stopping_min_steps)
+    config.training.early_stopping_patience_evals = int(args.early_stopping_patience_evals)
+    config.training.early_stopping_min_delta = float(args.early_stopping_min_delta)
+    config.training.early_stopping_smoothing_window = int(args.early_stopping_smoothing_window)
+    if args.early_stopping and not config.name.endswith("_isolated_earlystop"):
+        config.name = f"{config.name}_isolated_earlystop"
+
+
+def _resolve_output_root(args) -> str:
+    default_root = "results/dissertation/mcts_poison_runs_200k"
+    if args.early_stopping and args.output_root == default_root:
+        return "results/dissertation/isolated_earlystop_mcts_runs"
+    return args.output_root
 
 
 def _is_complete_run(run_dir: Path, total_steps: int) -> bool:
@@ -202,6 +217,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", default="results/dissertation/mcts_poison_runs_200k")
     parser.add_argument("--total-steps", type=int, default=None)
+    parser.add_argument("--early-stopping", action="store_true")
+    parser.add_argument("--early-stopping-min-steps", type=int, default=100000)
+    parser.add_argument("--early-stopping-patience-evals", type=int, default=25)
+    parser.add_argument("--early-stopping-min-delta", type=float, default=0.01)
+    parser.add_argument("--early-stopping-smoothing-window", type=int, default=5)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     parser.add_argument("--envs", nargs="+", default=["HalfCheetah-v4", "Walker2d-v4", "Hopper-v4"])
     parser.add_argument("--schedules", nargs="+", default=["random_sparse", "bursty"])
@@ -211,6 +231,7 @@ def main() -> None:
         default=["reward_poisoning", "action_perturbation", "observation_corruption"],
     )
     args = parser.parse_args()
+    output_root = _resolve_output_root(args)
 
     for env_id in args.envs:
         for schedule in args.schedules:
@@ -223,10 +244,11 @@ def main() -> None:
                             poison_type,
                             condition,
                             seed,
-                            args.output_root,
+                            output_root,
                             total_steps=args.total_steps,
                         )
-                        existing = _find_matching_completed_run(args.output_root, config)
+                        _apply_early_stopping_args(config, args)
+                        existing = _find_matching_completed_run(output_root, config)
                         if existing is not None:
                             print(f"SKIP {existing}")
                             continue

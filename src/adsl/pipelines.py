@@ -20,6 +20,7 @@ from .detection import (
     HeuristicDetector,
     compute_single_transition_features,
 )
+from .early_stopping import build_early_stopping_monitor
 from .experts import ExpertClassifier, train_supervised_classifier
 from .logging_utils import RunRecorder
 from .rl import Actor, Critic, make_env, sac_update
@@ -68,21 +69,11 @@ def _accept_result(trust: float = 1.0) -> MCTSResult:
         action="accept",
         score=0.0,
         trust=trust,
-        visit_counts={name: 0 for name in ("accept", "attenuate", "block", "sanitize")},
-        action_values={name: 0.0 for name in ("accept", "attenuate", "block", "sanitize")},
+        visit_counts={name: 0 for name in ("accept", "sanitize")},
+        action_values={name: 0.0 for name in ("accept", "sanitize")},
         predicted_deviation=0.0,
         predicted_return_drop=0.0,
     )
-
-
-def _mix_batches(batch_a: dict[str, np.ndarray], batch_b: dict[str, np.ndarray], weight_a: float) -> dict[str, np.ndarray]:
-    mixed: dict[str, np.ndarray] = {}
-    for key, value in batch_a.items():
-        if key == "corruption_type":
-            mixed[key] = np.asarray(batch_b[key], dtype=object)
-            continue
-        mixed[key] = weight_a * np.asarray(value) + (1.0 - weight_a) * np.asarray(batch_b[key])
-    return mixed
 
 
 def _build_shadow_state(
@@ -165,22 +156,26 @@ def run_experiment(config: ExperimentConfig) -> Path:
     expert_labels: list[str] = []
 
     accepted_updates = 0
-    blocked_updates = 0
     harmful_accepts = 0
-    benign_blocks = 0
     sanitized_transitions = 0
     attack_steps = 0
     flagged_windows = 0
     flagged_harmful_windows = 0
-    intervention_counts = {name: 0 for name in ("accept", "attenuate", "block", "sanitize")}
+    intervention_counts = {name: 0 for name in ("accept", "sanitize")}
     sanitize_clean_replay_uses = 0
-    attenuate_clean_replay_uses = 0
+    captured_suspicious_windows = 0
+    captured_harmful_windows = 0
     detector_runtime_ms_total = 0.0
     detector_runtime_calls = 0
     mcts_runtime_ms_total = 0.0
     mcts_runtime_calls = 0
+    early_stopping = build_early_stopping_monitor(config.training)
+    early_stopped = False
+    stop_reason = ""
+    completed_steps = 0
 
     for step in range(config.training.total_steps):
+        completed_steps = step + 1
         action = _action_from_env(env, actor, obs, step, config.training.start_steps, device)
         next_obs, reward, terminated, truncated, _ = env.step(action)
         next_obs = np.asarray(next_obs, dtype=np.float32)
@@ -305,7 +300,6 @@ def run_experiment(config: ExperimentConfig) -> Path:
                     "detector_runtime_ms": detector_runtime_ms,
                     "mcts_runtime_ms": mcts_runtime_ms,
                     "sanitize_replay_mode": config.controller.sanitize_replay_mode,
-                    "attenuate_replay_mode": config.controller.attenuate_replay_mode,
                 }
                 for action_name, visits in decision.visit_counts.items():
                     mcts_payload[f"visits_{action_name}"] = visits
@@ -344,50 +338,56 @@ def run_experiment(config: ExperimentConfig) -> Path:
                     "action_shift": action_shift,
                     "obs_shift": obs_shift,
                     "sanitize_replay_mode": config.controller.sanitize_replay_mode,
-                    "attenuate_replay_mode": config.controller.attenuate_replay_mode,
                     "clean_replay_available": int(replay.clean_size() > 0),
                     "used_clean_only_replay": 0,
                 }
             )
             decision_log_idx = len(recorder.decisions) - 1
+            window_has_corruption = int(window["corrupted"].max() > 0)
             if detector_flagged:
                 flagged_windows += 1
-                flagged_harmful_windows += int(window["corrupted"].max() > 0)
+                flagged_harmful_windows += window_has_corruption
+                captured_suspicious_windows += 1
+                captured_harmful_windows += window_has_corruption
             intervention_counts[decision.action] += 1
 
-            if config.logging.save_transition_windows:
-                single_features = compute_single_transition_features(
-                    {
-                        "obs": transition.obs,
-                        "act": transition.act,
-                        "rew": np.asarray([transition.rew], dtype=np.float32),
-                        "obs2": transition.obs2,
-                    }
-                )
-                window_payload = {
-                    **telemetry.sample(),
-                    "global_step": step,
-                    "env_id": config.env.id,
-                    "seed": config.seed,
-                    "schedule": config.corruption.schedule,
-                    "poison_type": config.corruption.type,
-                    "window_length": config.detector.window_length,
-                    "label": int(window["corrupted"].max() > 0),
-                    "detector_flag": int(detector_flagged),
-                    "detector_runtime_ms": detector_runtime_ms,
+            single_features = compute_single_transition_features(
+                {
+                    "obs": transition.obs,
+                    "act": transition.act,
+                    "rew": np.asarray([transition.rew], dtype=np.float32),
+                    "obs2": transition.obs2,
                 }
-                for name, value in zip(WINDOW_FEATURE_NAMES, detector_result.features):
-                    window_payload[f"window_{name}"] = float(value)
-                for name, value in zip(STEP_FEATURE_NAMES, single_features):
-                    window_payload[f"step_{name}"] = float(value)
+            )
+            window_payload = {
+                **telemetry.sample(),
+                "global_step": step,
+                "env_id": config.env.id,
+                "seed": config.seed,
+                "schedule": config.corruption.schedule,
+                "poison_type": config.corruption.type,
+                "window_length": config.detector.window_length,
+                "label": window_has_corruption,
+                "detector_flag": int(detector_flagged),
+                "controller_action": decision.action,
+                "expert_capture": int(detector_flagged),
+                "detector_runtime_ms": detector_runtime_ms,
+            }
+            for name, value in zip(WINDOW_FEATURE_NAMES, detector_result.features):
+                window_payload[f"window_{name}"] = float(value)
+            for name, value in zip(STEP_FEATURE_NAMES, single_features):
+                window_payload[f"step_{name}"] = float(value)
+            if config.logging.save_transition_windows:
                 recorder.log_detector_window(window_payload)
+            if detector_flagged:
+                recorder.log_captured_window(window_payload)
 
         should_store = True
         if (
             config.controller.enabled
             and config.controller.sanitize_replay
-            and bool(transition.corrupted)
-            and decision.action in {"block", "sanitize"}
+            and detector_flagged
+            and decision.action == "sanitize"
         ):
             should_store = False
             sanitized_transitions += 1
@@ -397,48 +397,34 @@ def run_experiment(config: ExperimentConfig) -> Path:
 
         if replay.size >= config.training.batch_size:
             train_batch = replay.sample(config.training.batch_size, rng)
-            harmful_update = bool(transition.corrupted and decision.action in {"accept", "attenuate"})
+            harmful_update = bool(transition.corrupted and decision.action == "accept")
             clean_replay_available = replay.clean_size() > 0
             used_clean_only_replay = 0
 
-            if decision.action == "block":
-                blocked_updates += 1
-                if not transition.corrupted:
-                    benign_blocks += 1
-            else:
-                if decision.action == "sanitize" and clean_replay_available:
-                    train_batch = replay.sample_clean(config.training.batch_size, rng)
-                    sanitize_clean_replay_uses += 1
-                    used_clean_only_replay = 1
-                elif decision.action == "attenuate" and clean_replay_available:
-                    clean_batch = replay.sample_clean(config.training.batch_size, rng)
-                    train_batch = _mix_batches(
-                        train_batch,
-                        clean_batch,
-                        1.0 - float(config.controller.attenuate_clean_ratio),
-                    )
-                    attenuate_clean_replay_uses += 1
-                    used_clean_only_replay = 1
+            if decision.action == "sanitize" and clean_replay_available:
+                train_batch = replay.sample_clean(config.training.batch_size, rng)
+                sanitize_clean_replay_uses += 1
+                used_clean_only_replay = 1
 
-                accepted_updates += 1
-                if harmful_update:
-                    harmful_accepts += 1
-                sac_update(
-                    actor=actor,
-                    critic1=critic1,
-                    critic2=critic2,
-                    target1=target1,
-                    target2=target2,
-                    log_alpha=log_alpha,
-                    opt_actor=opt_actor,
-                    opt_critic=opt_critic,
-                    opt_alpha=opt_alpha,
-                    batch=train_batch,
-                    gamma=config.training.gamma,
-                    tau=config.training.tau,
-                    target_entropy=target_entropy,
-                    device=device,
-                )
+            accepted_updates += 1
+            if harmful_update:
+                harmful_accepts += 1
+            sac_update(
+                actor=actor,
+                critic1=critic1,
+                critic2=critic2,
+                target1=target1,
+                target2=target2,
+                log_alpha=log_alpha,
+                opt_actor=opt_actor,
+                opt_critic=opt_critic,
+                opt_alpha=opt_alpha,
+                batch=train_batch,
+                gamma=config.training.gamma,
+                tau=config.training.tau,
+                target_entropy=target_entropy,
+                device=device,
+            )
             if decision_log_idx is not None:
                 recorder.decisions[decision_log_idx]["used_clean_only_replay"] = used_clean_only_replay
 
@@ -446,8 +432,8 @@ def run_experiment(config: ExperimentConfig) -> Path:
 
         if (step + 1) % config.training.eval_every == 0:
             eval_return_mean = evaluate_policy(eval_env, actor, device, config.training.eval_episodes)
+            stop_decision = early_stopping.update(step=step + 1, eval_return=eval_return_mean)
             harmful_accept_rate = harmful_accepts / max(1, accepted_updates)
-            benign_block_rate = benign_blocks / max(1, blocked_updates)
             recorder.log_metric(
                 {
                     **telemetry.sample(),
@@ -455,27 +441,38 @@ def run_experiment(config: ExperimentConfig) -> Path:
                     "env_id": config.env.id,
                     "seed": config.seed,
                     "global_step": step + 1,
+                    "target_steps": config.training.total_steps,
                     "eval_return_mean": eval_return_mean,
+                    "early_stopping_enabled": int(config.training.early_stopping_enabled),
+                    "early_stopping_min_steps": config.training.early_stopping_min_steps,
+                    "early_stopping_patience_evals": config.training.early_stopping_patience_evals,
+                    "early_stopping_min_delta": config.training.early_stopping_min_delta,
+                    "early_stopping_smoothing_window": config.training.early_stopping_smoothing_window,
+                    "early_stopped": int(stop_decision.should_stop),
+                    "stop_reason": stop_decision.reason,
+                    "early_stopping_best_smoothed_return": stop_decision.best_smoothed_return,
+                    "early_stopping_stale_evals": stop_decision.stale_evaluations,
                     "accepted_updates": accepted_updates,
-                    "blocked_updates": blocked_updates,
+                    "blocked_updates": 0,
                     "sanitized_transitions": sanitized_transitions,
                     "flagged_windows": flagged_windows,
                     "flagged_harmful_windows": flagged_harmful_windows,
+                    "captured_suspicious_windows": captured_suspicious_windows,
+                    "captured_harmful_windows": captured_harmful_windows,
                     "interventions_accept": intervention_counts["accept"],
-                    "interventions_attenuate": intervention_counts["attenuate"],
-                    "interventions_block": intervention_counts["block"],
+                    "interventions_attenuate": 0,
+                    "interventions_block": 0,
                     "interventions_sanitize": intervention_counts["sanitize"],
                     "sanitize_clean_replay_uses": sanitize_clean_replay_uses,
-                    "attenuate_clean_replay_uses": attenuate_clean_replay_uses,
+                    "attenuate_clean_replay_uses": 0,
                     "attack_steps": attack_steps,
                     "harmful_accept_rate": harmful_accept_rate,
-                    "benign_block_rate": benign_block_rate,
+                    "benign_block_rate": 0.0,
                     "policy_backbone": "SACActorMLP256x256TanhGaussian",
                     "reference_actor_role": "clean_policy_reference_snapshot",
                     "experts_enabled": int(config.experts.enabled),
                     "experts_mode": config.experts.mode,
                     "sanitize_replay_mode": config.controller.sanitize_replay_mode,
-                    "attenuate_replay_mode": config.controller.attenuate_replay_mode,
                     "attack_budget": config.corruption.poison_budget,
                     "attack_budget_unit": config.corruption.poison_budget_unit,
                     "attacker_capability": config.corruption.attacker_capability,
@@ -491,34 +488,49 @@ def run_experiment(config: ExperimentConfig) -> Path:
                     "detector_f1": np.nan,
                 }
             )
+            if stop_decision.should_stop:
+                early_stopped = True
+                stop_reason = stop_decision.reason
+                break
 
     final_payload = {
         **telemetry.sample(),
         "run_name": run_name,
         "env_id": config.env.id,
         "seed": config.seed,
-        "global_step": config.training.total_steps,
+        "global_step": completed_steps,
+        "target_steps": config.training.total_steps,
         "eval_return_mean": evaluate_policy(eval_env, actor, device, config.training.eval_episodes),
+        "early_stopping_enabled": int(config.training.early_stopping_enabled),
+        "early_stopping_min_steps": config.training.early_stopping_min_steps,
+        "early_stopping_patience_evals": config.training.early_stopping_patience_evals,
+        "early_stopping_min_delta": config.training.early_stopping_min_delta,
+        "early_stopping_smoothing_window": config.training.early_stopping_smoothing_window,
+        "early_stopped": int(early_stopped),
+        "stop_reason": stop_reason,
+        "early_stopping_best_smoothed_return": early_stopping.best_smoothed_return,
+        "early_stopping_stale_evals": early_stopping.stale_evaluations,
         "accepted_updates": accepted_updates,
-        "blocked_updates": blocked_updates,
+        "blocked_updates": 0,
         "sanitized_transitions": sanitized_transitions,
         "flagged_windows": flagged_windows,
         "flagged_harmful_windows": flagged_harmful_windows,
+        "captured_suspicious_windows": captured_suspicious_windows,
+        "captured_harmful_windows": captured_harmful_windows,
         "interventions_accept": intervention_counts["accept"],
-        "interventions_attenuate": intervention_counts["attenuate"],
-        "interventions_block": intervention_counts["block"],
+        "interventions_attenuate": 0,
+        "interventions_block": 0,
         "interventions_sanitize": intervention_counts["sanitize"],
         "sanitize_clean_replay_uses": sanitize_clean_replay_uses,
-        "attenuate_clean_replay_uses": attenuate_clean_replay_uses,
+        "attenuate_clean_replay_uses": 0,
         "attack_steps": attack_steps,
         "harmful_accept_rate": harmful_accepts / max(1, accepted_updates),
-        "benign_block_rate": benign_blocks / max(1, blocked_updates),
+        "benign_block_rate": 0.0,
         "policy_backbone": "SACActorMLP256x256TanhGaussian",
         "reference_actor_role": "clean_policy_reference_snapshot",
         "experts_enabled": int(config.experts.enabled),
         "experts_mode": config.experts.mode,
         "sanitize_replay_mode": config.controller.sanitize_replay_mode,
-        "attenuate_replay_mode": config.controller.attenuate_replay_mode,
         "attack_budget": config.corruption.poison_budget,
         "attack_budget_unit": config.corruption.poison_budget_unit,
         "attacker_capability": config.corruption.attacker_capability,

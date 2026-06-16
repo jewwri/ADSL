@@ -24,9 +24,16 @@ def _slugify(value: str) -> str:
 def _campaign_root(args) -> Path:
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     threshold = "default" if args.detector_threshold is None else str(args.detector_threshold).replace(".", "p")
+    early_stop = ""
+    if args.early_stopping:
+        delta = str(args.early_stopping_min_delta).replace(".", "p")
+        early_stop = (
+            f"_isolated_earlystop_min{args.early_stopping_min_steps}"
+            f"_patience{args.early_stopping_patience_evals}_delta{delta}"
+        )
     label = (
         f"{args.backend}_steps{args.total_steps}_window{args.window_length}_"
-        f"threshold{threshold}_{stamp}"
+        f"threshold{threshold}{early_stop}_{stamp}"
     )
     if args.campaign_name:
         label = f"{_slugify(args.campaign_name)}_{label}"
@@ -41,6 +48,16 @@ def _write_manifest(path: Path, args, resolved_output_root: Path) -> None:
     (path / "campaign_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
 
 
+def _apply_early_stopping_args(config, args) -> None:
+    config.training.early_stopping_enabled = bool(args.early_stopping)
+    config.training.early_stopping_min_steps = int(args.early_stopping_min_steps)
+    config.training.early_stopping_patience_evals = int(args.early_stopping_patience_evals)
+    config.training.early_stopping_min_delta = float(args.early_stopping_min_delta)
+    config.training.early_stopping_smoothing_window = int(args.early_stopping_smoothing_window)
+    if args.early_stopping and not config.name.endswith("_isolated_earlystop"):
+        config.name = f"{config.name}_isolated_earlystop"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", choices=["mcts", "iforest"], default="mcts")
@@ -50,6 +67,11 @@ def main() -> None:
     parser.add_argument("--window-length", type=int, default=200)
     parser.add_argument("--warmup-steps", type=int, default=1000)
     parser.add_argument("--detector-threshold", type=float, default=None)
+    parser.add_argument("--early-stopping", action="store_true")
+    parser.add_argument("--early-stopping-min-steps", type=int, default=100000)
+    parser.add_argument("--early-stopping-patience-evals", type=int, default=25)
+    parser.add_argument("--early-stopping-min-delta", type=float, default=0.01)
+    parser.add_argument("--early-stopping-smoothing-window", type=int, default=5)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     parser.add_argument("--envs", nargs="+", default=["HalfCheetah-v4", "Walker2d-v4", "Hopper-v4"])
     parser.add_argument("--schedules", nargs="+", default=["random_sparse", "bursty"])
@@ -67,7 +89,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--gate-mode",
-        choices=["accept", "attenuate", "block", "sanitize"],
+        choices=["accept", "sanitize"],
         default="sanitize",
         help="Used only for backend=iforest.",
     )
@@ -95,6 +117,7 @@ def main() -> None:
                             )
                             config.detector.window_length = int(args.window_length)
                             config.detector.warmup_steps = int(args.warmup_steps)
+                            _apply_early_stopping_args(config, args)
                             if args.detector_threshold is not None:
                                 config.detector.trigger_threshold = float(args.detector_threshold)
                             run_dir = run_experiment(config)
@@ -116,6 +139,7 @@ def main() -> None:
                         window_length=args.window_length,
                         warmup_steps=args.warmup_steps,
                     )
+                    _apply_early_stopping_args(config, args)
                     run_dir = run_isolation_forest_experiment(
                         config,
                         gate_mode=args.gate_mode,

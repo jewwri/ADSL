@@ -102,23 +102,16 @@ def test_controller_runs_mcts_when_baseline_ready():
         ),
     )
 
-    assert result.action in {"accept", "attenuate", "block", "sanitize"}
+    assert result.action in {"accept", "sanitize"}
     assert sum(result.visit_counts.values()) == cfg.mcts_simulations
     assert 0.0 <= result.trust <= 1.0
 
 
-def test_attenuate_uses_configured_clean_ratio():
-    cfg = ControllerConfig(
-        enabled=True,
-        mode="mcts",
-        attenuate_clean_ratio=0.25,
-    )
+def test_sanitize_uses_clean_replacement_batch():
+    cfg = ControllerConfig(enabled=True, mode="mcts")
     controller = LookaheadController(cfg)
     flagged = _make_batch(batch_size=4, obs_dim=3, act_dim=2)
     clean = _make_batch(batch_size=4, obs_dim=3, act_dim=2)
-    mixed = controller._batch_for_action("attenuate", flagged, clean)
+    sanitized = controller._batch_for_action("sanitize", flagged, clean)
 
-    np.testing.assert_allclose(
-        mixed["obs"],
-        0.75 * flagged["obs"] + 0.25 * clean["obs"],
-    )
+    assert sanitized is clean

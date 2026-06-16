@@ -118,7 +118,7 @@ def build_iforest_config(
         training.total_steps = int(total_steps)
 
     return ExperimentConfig(
-        name=f"iforest_{env_id.replace('-', '').replace('v', 'v_')}_{poison_type}_{schedule}_detector_only",
+        name=f"iforest_{env_id.replace('-', '').replace('v', 'v_')}_{poison_type}_{schedule}_sanitize_gated",
         seed=seed,
         output_root=output_root,
         env=EnvConfig(id=env_id),
@@ -135,11 +135,30 @@ def build_iforest_config(
             mode="none",
             harm_threshold=1.0,
             sanitize_replay=False,
-            attenuate_clean_ratio=0.5,
         ),
         corruption=_corruption_for(poison_type, schedule, condition="attack_none"),
         logging=LoggingConfig(save_transition_windows=True, save_model_checkpoints=False),
     )
+
+
+def _apply_early_stopping_args(config: ExperimentConfig, args) -> None:
+    config.training.early_stopping_enabled = bool(args.early_stopping)
+    config.training.early_stopping_min_steps = int(args.early_stopping_min_steps)
+    config.training.early_stopping_patience_evals = int(args.early_stopping_patience_evals)
+    config.training.early_stopping_min_delta = float(args.early_stopping_min_delta)
+    config.training.early_stopping_smoothing_window = int(args.early_stopping_smoothing_window)
+    if args.early_stopping and not config.name.endswith("_isolated_earlystop"):
+        config.name = f"{config.name}_isolated_earlystop"
+
+
+def _resolve_output_root(args) -> str:
+    default_root = (
+        "results/dissertation/iforest_parameterized_runs/"
+        "window200_iforest_baseline_iforest_steps200000_window200_thresholddefault_20260507T214909"
+    )
+    if args.early_stopping and args.output_root == default_root:
+        return "results/dissertation/iforest_parameterized_runs/isolated_earlystop_iforest_window200"
+    return args.output_root
 
 
 def main() -> None:
@@ -154,12 +173,17 @@ def main() -> None:
     parser.add_argument("--total-steps", type=int, default=200000)
     parser.add_argument("--window-length", type=int, default=200)
     parser.add_argument("--warmup-steps", type=int, default=1000)
+    parser.add_argument("--early-stopping", action="store_true")
+    parser.add_argument("--early-stopping-min-steps", type=int, default=100000)
+    parser.add_argument("--early-stopping-patience-evals", type=int, default=25)
+    parser.add_argument("--early-stopping-min-delta", type=float, default=0.01)
+    parser.add_argument("--early-stopping-smoothing-window", type=int, default=5)
     parser.add_argument("--iforest-contamination", type=float, default=0.05)
     parser.add_argument("--iforest-n-estimators", type=int, default=200)
     parser.add_argument("--iforest-min-fit-windows", type=int, default=128)
     parser.add_argument(
         "--gate-mode",
-        choices=["accept", "attenuate", "block", "sanitize"],
+        choices=["accept", "sanitize"],
         default="sanitize",
     )
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
@@ -171,6 +195,7 @@ def main() -> None:
         default=["reward_poisoning", "action_perturbation", "observation_corruption"],
     )
     args = parser.parse_args()
+    output_root = _resolve_output_root(args)
 
     for env_id in args.envs:
         for schedule in args.schedules:
@@ -181,11 +206,12 @@ def main() -> None:
                         schedule=schedule,
                         poison_type=poison_type,
                         seed=seed,
-                        output_root=args.output_root,
+                        output_root=output_root,
                         total_steps=args.total_steps,
                         window_length=args.window_length,
                         warmup_steps=args.warmup_steps,
                     )
+                    _apply_early_stopping_args(config, args)
                     run_dir = run_isolation_forest_experiment(
                         config,
                         gate_mode=args.gate_mode,

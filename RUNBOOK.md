@@ -29,6 +29,27 @@ python3 scripts/run_dissertation_campaign.py \
 
 The runner is resume-safe and skips completed cells by matching `config.json` plus final `global_step`.
 
+## Run A 200k-Capped Campaign With Early Stopping
+
+Use this for future reruns where `200000` remains the maximum horizon but runs may stop after a sustained evaluation plateau:
+
+```bash
+python3 scripts/run_parameterized_campaign.py \
+  --backend mcts \
+  --output-root results/dissertation/third_run \
+  --campaign-name window200_early_stop \
+  --total-steps 200000 \
+  --window-length 200 \
+  --early-stopping \
+  --early-stopping-min-steps 100000 \
+  --early-stopping-patience-evals 25 \
+  --early-stopping-min-delta 0.01 \
+  --early-stopping-smoothing-window 5
+```
+
+Early stopping is evaluated only at evaluation boundaries. The final metrics row records both `global_step` and `target_steps`, plus `early_stopped`, `stop_reason`, and plateau diagnostics.
+When `--early-stopping` is set, generated campaign and run directory names include `isolated_earlystop` so they do not blend into fixed-horizon result families.
+
 ## Rebuild The 200k MCTS Report Data
 
 ```bash

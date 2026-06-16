@@ -12,7 +12,7 @@ import torch.optim as optim
 from .rl import Actor, Critic, sac_update
 
 
-INTERVENTION_ACTIONS = ("accept", "attenuate", "block", "sanitize")
+INTERVENTION_ACTIONS = ("accept", "sanitize")
 
 
 @dataclass
@@ -114,6 +114,16 @@ class LookaheadController:
                 action="accept",
                 score=0.0,
                 trust=1.0,
+                visit_counts={name: 0 for name in INTERVENTION_ACTIONS},
+                action_values={name: 0.0 for name in INTERVENTION_ACTIONS},
+                predicted_deviation=0.0,
+                predicted_return_drop=0.0,
+            )
+        if ctx.detector_risk < float(self.config.harm_threshold):
+            return MCTSResult(
+                action="accept",
+                score=0.0,
+                trust=max(0.0, 1.0 - ctx.detector_risk),
                 visit_counts={name: 0 for name in INTERVENTION_ACTIONS},
                 action_values={name: 0.0 for name in INTERVENTION_ACTIONS},
                 predicted_deviation=0.0,
@@ -246,21 +256,10 @@ class LookaheadController:
         flagged_batch: dict[str, np.ndarray],
         clean_batch: dict[str, np.ndarray],
     ) -> dict[str, np.ndarray] | None:
-        if action == "block":
-            return None
         if action == "accept":
             return flagged_batch
         if action == "sanitize":
             return clean_batch
-        if action == "attenuate":
-            ratio = float(self.config.attenuate_clean_ratio)
-            batch = {}
-            for key in flagged_batch:
-                if key == "corruption_type":
-                    batch[key] = flagged_batch[key]
-                else:
-                    batch[key] = (1.0 - ratio) * flagged_batch[key] + ratio * clean_batch[key]
-            return batch
         return flagged_batch
 
     def _copy_shadow_state(self, learner_state: ShadowLearnerState) -> ShadowLearnerState:

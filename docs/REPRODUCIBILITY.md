@@ -63,6 +63,27 @@ python3 scripts/run_dissertation_campaign.py \
 
 The runner skips completed cells by inspecting existing run configs and final metrics.
 
+## Future 200k-Capped Early-Stopping Runs
+
+The retained dissertation artifacts are fixed-horizon `200000`-step runs. For a future third run, keep `200000` as the maximum horizon and enable plateau-based early stopping:
+
+```bash
+python3 scripts/run_parameterized_campaign.py \
+  --backend mcts \
+  --output-root results/dissertation/third_run \
+  --campaign-name window200_early_stop \
+  --total-steps 200000 \
+  --window-length 200 \
+  --early-stopping \
+  --early-stopping-min-steps 100000 \
+  --early-stopping-patience-evals 25 \
+  --early-stopping-min-delta 0.01 \
+  --early-stopping-smoothing-window 5
+```
+
+The same flags are available on `scripts/run_dissertation_campaign.py` and `scripts/run_iforest_detector_baseline.py`.
+Early-stopped campaign directories and per-run directories include `isolated_earlystop`; the default early-stopped output roots are separate from the retained fixed-horizon result roots.
+
 ## Rebuild 200k Derived Data
 
 ```bash

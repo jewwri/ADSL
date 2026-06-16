@@ -10,6 +10,7 @@ This dictionary covers the canonical dissertation artifacts declared in `experim
 - `condition`: MCTS matrix condition, one of `clean`, `attack_none`, or `attack_defended`.
 - `seed`: integer random seed, retained values `0` through `4`.
 - `global_step`: final training step. Canonical retained summaries must reach `200000`.
+- `target_steps`: configured maximum training horizon. Future early-stopped runs can have `global_step < target_steps`.
 
 ## Common Run Columns
 
@@ -17,25 +18,32 @@ This dictionary covers the canonical dissertation artifacts declared in `experim
 - `run_dir`: path to the run directory that produced the row.
 - `eval_return_mean`: mean evaluation return at the logged step.
 - `accepted_updates`: number of training updates accepted by the pipeline.
-- `blocked_updates`: number of updates blocked by the defense.
+- `blocked_updates`: legacy blocked-update count from old artifacts; corrected ADSL accept/sanitize runs emit `0`.
 - `sanitized_transitions`: number of harmful transitions withheld or sanitized before replay influence.
 - `flagged_windows`: number of detector-flagged transition windows.
 - `flagged_harmful_windows`: number of detector-flagged windows containing harmful corruption.
+- `captured_suspicious_windows`: number of detector-flagged windows captured for expert-training evidence.
+- `captured_harmful_windows`: number of captured windows that contain injected corruption according to experiment labels.
 - `attack_steps`: number of poisoned attack steps observed by the run.
 - `harmful_accept_rate`: fraction of harmful attack updates accepted.
-- `benign_block_rate`: fraction of benign updates blocked.
+- `benign_block_rate`: legacy benign-block rate from old artifacts; corrected ADSL accept/sanitize runs emit `0`.
 - `detector_precision`, `detector_recall`, `detector_f1`: detector quality against poisoned-window labels.
+- `early_stopping_enabled`: whether plateau-based stopping was enabled for the run.
+- `early_stopping_min_steps`, `early_stopping_patience_evals`, `early_stopping_min_delta`, `early_stopping_smoothing_window`: stopping policy configuration emitted with telemetry-backed metric rows.
+- `early_stopped`: whether the run stopped before `target_steps`.
+- `stop_reason`: reason for early stopping, currently `plateau` when triggered.
+- `early_stopping_best_smoothed_return`: best smoothed evaluation return seen by the stopping monitor.
+- `early_stopping_stale_evals`: number of consecutive evaluation points without meaningful smoothed-return improvement.
 
 ## MCTS Intervention Columns
 
-- `interventions_accept`: detector-flagged windows where MCTS selected `accept`.
-- `interventions_attenuate`: detector-flagged windows where MCTS selected `attenuate`.
-- `interventions_block`: detector-flagged windows where MCTS selected `block`.
-- `interventions_sanitize`: detector-flagged windows where MCTS selected `sanitize`.
+- `interventions_accept`: detector-flagged windows where ADSL selected `accept`.
+- `interventions_attenuate`: legacy column retained for old artifacts; corrected ADSL runs emit `0`.
+- `interventions_block`: legacy column retained for old artifacts; corrected ADSL runs emit `0`.
+- `interventions_sanitize`: detector-flagged windows where ADSL selected `sanitize`.
 - `sanitize_clean_replay_uses`: count of sanitize actions that used clean-only replay.
-- `attenuate_clean_replay_uses`: count of attenuate actions that used clean replay mixing.
+- `attenuate_clean_replay_uses`: legacy column retained for old artifacts; corrected ADSL runs emit `0`.
 - `sanitize_replay_mode`: sanitize implementation mode, retained as configuration evidence.
-- `attenuate_replay_mode`: attenuation implementation mode, retained as configuration evidence.
 - `policy_backbone`: actor architecture identifier.
 - `reference_actor_role`: role of the clean actor snapshot used for MCTS deviation scoring.
 - `experts_enabled`, `experts_mode`: retained to document that the final matrix disables expert intervention.
@@ -68,8 +76,8 @@ Telemetry summaries include all common run columns plus:
 Isolation Forest summaries include telemetry-style runtime columns plus:
 
 - `detector_backend`: detector implementation name.
-- `detector_gate_mode`: gate action used by the detector-only baseline.
-- `detector_threshold`: risk threshold for detector-only gating.
+- `detector_gate_mode`: gate action used by the Isolation Forest sanitize-gated ablation.
+- `detector_threshold`: risk threshold for Isolation Forest gating.
 - `detector_fit_runtime_ms_total`: cumulative Isolation Forest fitting runtime.
 
 ## Derived Visual Dataset Columns
@@ -83,7 +91,6 @@ Isolation Forest summaries include telemetry-style runtime columns plus:
 - `controller_mode`: controller mode, usually `mcts` for defended rows and `none` otherwise.
 - `mcts_simulations`: MCTS simulation count.
 - `mcts_horizon`: MCTS rollout horizon.
-- `attenuate_clean_ratio`: clean replay weighting used by attenuation.
 - `target_steps`: configured training horizon.
 - `batch_size`: SAC update batch size.
 - `replay_size`: replay buffer capacity.
